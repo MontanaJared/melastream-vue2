@@ -15,6 +15,7 @@
         <!-- Event timing sequence in chronological order -->
         <p><strong>Walk-in Start:</strong> {{ formatDateTime(walkInStart) }}</p>
         <p><strong>Event Start:</strong> {{ formatDateTime(eventStart) }}</p>
+        <p><strong>Button Start:</strong> {{ formatDateTime(buttonStart) }}</p>
         <p><strong>Event End:</strong> {{ formatDateTime(eventEnd) }}</p>
       </div>
     </div>
@@ -213,34 +214,29 @@ export default {
     async fetchEventTimes() {
       try {
         const res = await axios.get('https://wzun0tc594.execute-api.us-west-2.amazonaws.com/eventTimes?eventId=testEvent5')
-        console.log('Complete API response:', res)
-        
         const data = res.data
         if (!data) {
           console.error('No data in response:', res)
           return
         }
 
-        // Log raw timing data for debugging
-        console.log('Data before parsing:', {
-          start: data.start,
-          walkInStart: data.walkInStart,
-          end: data.end,
-          startDay: data.startDay
-        })
+        // Debug log the raw data
+        console.log('Data before parsing:', data)
 
-        // Parse and set all event times
-        this.eventStart = data.start ? new Date(data.start) : new Date()
-        this.walkInStart = data.walkInStart ? new Date(data.walkInStart) : new Date()
-        this.eventEnd = data.end ? new Date(data.end) : new Date()
-        this.buttonStart = data.startDay ? new Date(data.startDay) : new Date()
+        // Parse the dates using the correct fields
+        this.eventStart = new Date(data.eventStart.replace(' MDT', ''))
+        this.walkInStart = new Date(data.walkInStart.replace(' MDT', ''))
+        this.eventEnd = new Date(data.eventEnd.replace(' MDT', ''))
+        this.buttonStart = new Date(data.buttonStart.replace(' MDT', ''))  // Use buttonStart instead of eventStartDay
+        this.countdownTimer = new Date(data.countdownTimer.replace(' MDT', ''))  // Add countdown timer
 
-        // Log parsed times for verification
+        // Log the parsed times for verification
         console.log('Times after parsing:', {
           eventStart: this.eventStart.toLocaleString(),
           walkInStart: this.walkInStart.toLocaleString(),
           eventEnd: this.eventEnd.toLocaleString(),
-          buttonStart: this.buttonStart.toLocaleString()
+          buttonStart: this.buttonStart.toLocaleString(),
+          countdownTimer: this.countdownTimer.toLocaleString()
         })
 
       } catch (error) {
