@@ -220,23 +220,32 @@ export default {
           return
         }
 
-        // Debug log the raw data
-        console.log('Data before parsing:', data)
+        // Helper function to parse MDT time correctly
+        const parseMDTTime = (timeStr) => {
+          if (!timeStr) return new Date()
+          // Parse the date string but keep it in MDT timezone
+          const [datePart, timePart, timezone] = timeStr.split(' ')
+          const dateStr = `${datePart} ${timePart}`
+          const date = new Date(dateStr)
+          // Adjust for MDT (UTC-6)
+          date.setHours(date.getHours() + 6)
+          return date
+        }
 
-        // Parse the dates using the correct fields
-        this.eventStart = new Date(data.eventStart.replace(' MDT', ''))
-        this.walkInStart = new Date(data.walkInStart.replace(' MDT', ''))
-        this.eventEnd = new Date(data.eventEnd.replace(' MDT', ''))
-        this.buttonStart = new Date(data.buttonStart.replace(' MDT', ''))  // Use buttonStart instead of eventStartDay
-        this.countdownTimer = new Date(data.countdownTimer.replace(' MDT', ''))  // Add countdown timer
+        // Parse all dates using the helper function
+        this.walkInStart = parseMDTTime(data.walkInStart)
+        this.eventStart = parseMDTTime(data.eventStart)
+        this.buttonStart = parseMDTTime(data.buttonStart)
+        this.eventEnd = parseMDTTime(data.eventEnd)
+        this.countdownTimer = parseMDTTime(data.countdownTimer)
 
-        // Log the parsed times for verification
+        // Log the parsed times for debugging
         console.log('Times after parsing:', {
-          eventStart: this.eventStart.toLocaleString(),
           walkInStart: this.walkInStart.toLocaleString(),
-          eventEnd: this.eventEnd.toLocaleString(),
+          eventStart: this.eventStart.toLocaleString(),
           buttonStart: this.buttonStart.toLocaleString(),
-          countdownTimer: this.countdownTimer.toLocaleString()
+          eventEnd: this.eventEnd.toLocaleString(),
+          countdownTimer: this.countdownTimer?.toLocaleString()
         })
 
       } catch (error) {
