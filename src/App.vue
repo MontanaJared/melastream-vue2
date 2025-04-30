@@ -70,6 +70,7 @@
 
 <script>
 import axios from 'axios'
+import { DateTime } from 'luxon'
 
 export default {
   name: 'App',
@@ -114,16 +115,13 @@ export default {
      * @returns {string} Formatted date string in MM/DD/YYYY, HH:MM AM/PM format
      */
     formatDateTime(date) {
-      if (!date) return 'Not set'
+      // If no date provided or invalid date, return a message
+      if (!date) {
+        return 'Pending...'
+      }
       try {
-        return date.toLocaleString('en-US', {
-          month: '2-digit',
-          day: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        })
+        // Convert JS Date to Luxon DateTime and display in America/Denver
+        return DateTime.fromJSDate(date).setZone('America/Denver').toFormat('MM/dd/yyyy, hh:mm a')
       } catch (e) {
         console.error('Date formatting error:', e)
         return 'Invalid Date'
@@ -194,7 +192,7 @@ export default {
         this.cdHours = Math.floor((diff / (1000 * 60 * 60)) % 24)
         this.cdMinutes = Math.floor((diff / (1000 * 60)) % 60)
         this.cdSeconds = Math.floor((diff / 1000) % 60)
-      } else {
+  } else {
         this.showCountdown = false
       }
     },
@@ -215,37 +213,62 @@ export default {
       try {
         const res = await axios.get('https://wzun0tc594.execute-api.us-west-2.amazonaws.com/eventTimes?eventId=testEvent5')
         const data = res.data
+        console.log('Raw API response:', data)
         if (!data) {
           console.error('No data in response:', res)
           return
         }
 
-        // Helper function to parse MDT time correctly
-        const parseMDTTime = (timeStr) => {
-          if (!timeStr) return new Date()
-          // Parse the date string but keep it in MDT timezone
-          const [datePart, timePart, timezone] = timeStr.split(' ')
-          const dateStr = `${datePart} ${timePart}`
-          const date = new Date(dateStr)
-          // Adjust for MDT (UTC-6)
-          date.setHours(date.getHours() + 6)
-          return date
+        // Parse dates with better error handling
+        const parseDate = (dateStr) => {
+          if (!dateStr) {
+            console.log('No date string provided, using current date')
+            return new Date()
+          }
+          try {
+            let dt
+            if (dateStr.includes('MDT') || dateStr.includes('MST')) {
+              // Parse as America/Denver (MDT/MST)
+              dt = DateTime.fromFormat(dateStr, "MMMM d, yyyy HH:mm:ss z", { zone: "America/Denver" })
+            } else if (/^\d{4}-\d{2}-\d{2}T/.test(dateStr)) {
+              // Parse ISO string
+              dt = DateTime.fromISO(dateStr)
+            } else {
+              // Fallback: try native Date
+              return new Date(dateStr)
+            }
+            if (!dt.isValid) {
+              console.error('Invalid date created from:', dateStr)
+              return new Date()
+            }
+            return dt.toJSDate()
+          } catch (e) {
+            console.error('Error parsing date:', dateStr, e)
+            return new Date()
+          }
         }
 
-        // Parse all dates using the helper function
-        this.walkInStart = parseMDTTime(data.walkInStart)
-        this.eventStart = parseMDTTime(data.eventStart)
-        this.buttonStart = parseMDTTime(data.buttonStart)
-        this.eventEnd = parseMDTTime(data.eventEnd)
-        this.countdownTimer = parseMDTTime(data.countdownTimer)
+        // Parse all times with correct API keys
+        const times = {
+          walkInStart: data.walkInStart,
+          eventStart: data.start,
+          buttonStart: data.buttonStart,
+          eventEnd: data.end
+        }
+        console.log('Times before parsing:', times)
 
-        // Log the parsed times for debugging
-        console.log('Times after parsing:', {
-          walkInStart: this.walkInStart.toLocaleString(),
-          eventStart: this.eventStart.toLocaleString(),
-          buttonStart: this.buttonStart.toLocaleString(),
-          eventEnd: this.eventEnd.toLocaleString(),
-          countdownTimer: this.countdownTimer?.toLocaleString()
+        // Set the times
+        this.walkInStart = parseDate(times.walkInStart)
+        this.eventStart = parseDate(times.eventStart)
+        this.buttonStart = parseDate(times.buttonStart)
+        this.eventEnd = parseDate(times.eventEnd)
+
+        // Log final parsed times
+        console.log('Parsed times:', {
+          walkInStart: this.walkInStart,
+          eventStart: this.eventStart,
+          buttonStart: this.buttonStart,
+          eventEnd: this.eventEnd
         })
 
       } catch (error) {
@@ -261,7 +284,9 @@ export default {
       try {
         const res = await axios.get('https://s6ivtaeizj.execute-api.us-west-2.amazonaws.com/returnUTC')
         console.log('Server time response:', res.data)
-        return new Date(res.data.serverDate)
+        // Parse as UTC, then convert to America/Denver
+        const dt = DateTime.fromISO(res.data.serverDate, { zone: 'utc' }).setZone('America/Denver')
+        return dt.toJSDate()
       } catch (error) {
         console.error('Error fetching server time:', error)
         return new Date()
